@@ -1,0 +1,46 @@
+name: Build APK
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the repository
+        uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: unzip -q ExamCountdown.zip -d work
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Create signing key
+        run: |
+          keytool -genkeypair -keystore "$GITHUB_WORKSPACE/release.jks" -alias examkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass examcountdown123 -keypass examcountdown123 \
+            -dname "CN=Exam Countdown, O=Personal, C=IN"
+
+      - name: Build signed APK
+        working-directory: work/ExamCountdown
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/release.jks
+          KEYSTORE_PASSWORD: examcountdown123
+          KEY_ALIAS: examkey
+          KEY_PASSWORD: examcountdown123
+        run: gradle assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExamCountdown-APK
+          path: work/ExamCountdown/app/build/outputs/apk/release/*.apk
